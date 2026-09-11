@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Dummy-but-valid values: modules connect lazily, so CI never needs a
+      # live Postgres/Redis. A real DATABASE_URL is required by `lib/env.ts`.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/relayflow
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/relayflow
+      REDIS_URL: redis://localhost:6379
+      MASTER_ENCRYPTION_KEY: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+      AUTH_JWT_SECRET: ci-only-jwt-secret-000000000000000000000
+      APP_BASE_URL: http://localhost:3000
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Check environment schema
+        run: npm run check:env
+
+      - name: Production build
+        run: npm run build
